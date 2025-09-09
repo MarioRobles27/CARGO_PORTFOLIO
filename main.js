@@ -1,4 +1,3 @@
-
 // ===== Barra de progreso =====
 (function(){
   const progress = document.getElementById('progress');
