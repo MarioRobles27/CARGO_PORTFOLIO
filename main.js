@@ -270,223 +270,159 @@
   }
 })();
 
-// ===== TRABAJOS: acordeón + detalle + carruseles =====
-(function(){
+// ===== TRABAJOS: acordeón + detalle (delegación robusta) =====
+(function () {
   const hub = document.getElementById('workHub');
-  if(!hub) return;
+  if (!hub) return;
 
-  const groups = [...hub.querySelectorAll('.work-group')];
   const TRANSITION_MS = 480;
   const DETAIL_MS = 620;
 
-  const openPanel = (panel)=>{
+  // Estado inicial de todos los submenús
+  hub.querySelectorAll('.work-group').forEach(group => {
+    const btn   = group.querySelector('.work-tile');
+    const panel = group.querySelector('.submenu');
+    if (panel) {
+      panel.hidden = true;
+      panel.style.maxHeight     = '0px';
+      panel.style.opacity       = '0';
+      panel.style.pointerEvents = 'none';
+    }
+    if (btn) btn.setAttribute('aria-expanded', 'false');
+  });
+
+  const openPanel = (panel) => {
     panel.hidden = false;
-    requestAnimationFrame(()=>{
+    requestAnimationFrame(() => {
       panel.style.pointerEvents = 'auto';
       panel.style.opacity = '1';
       panel.style.maxHeight = panel.scrollHeight + 'px';
     });
   };
-  const closePanel = (panel)=>{
+  const closePanel = (panel) => {
     panel.style.opacity = '0';
     panel.style.maxHeight = '0px';
     panel.style.pointerEvents = 'none';
-    setTimeout(()=>{ panel.hidden = true; }, TRANSITION_MS);
+    setTimeout(() => { panel.hidden = true; }, TRANSITION_MS);
   };
-  const closeAllGroups = (except=null)=>{
-    groups.forEach(g=>{
-      if(g!==except && g.classList.contains('open')){
-        const b = g.querySelector('.work-tile');
-        const p = g.querySelector('.submenu');
+  const closeAllGroups = (except = null) => {
+    hub.querySelectorAll('.work-group.open').forEach(g => {
+      if (g !== except) {
         g.classList.remove('open');
-        if(b) b.setAttribute('aria-expanded','false');
-        if(p) closePanel(p);
+        g.querySelector('.work-tile')?.setAttribute('aria-expanded', 'false');
+        const p = g.querySelector('.submenu');
+        if (p) closePanel(p);
       }
     });
   };
 
-  groups.forEach(group=>{
-    const btn   = group.querySelector('.work-tile');
-    const panel = group.querySelector('.submenu');
-    if(!btn || !panel) return;
-
-    panel.hidden = true;
-    panel.style.maxHeight = '0px';
-    panel.style.opacity   = '0';
-    panel.style.pointerEvents = 'none';
-    btn.setAttribute('aria-expanded','false');
-
-    btn.addEventListener('click', (e)=>{
-      e.preventDefault();
-      const isOpen = group.classList.contains('open');
-      if(isOpen){
-        group.classList.remove('open');
-        btn.setAttribute('aria-expanded','false');
-        closePanel(panel);
-      }else{
-        closeAllGroups(group);
-        group.classList.add('open');
-        btn.setAttribute('aria-expanded','true');
-        openPanel(panel);
-      }
-    });
-
-    group._closeGroup = ()=>{
-      if(group.classList.contains('open')){
-        group.classList.remove('open');
-        btn.setAttribute('aria-expanded','false');
-        closePanel(panel);
-      }
-    };
-  });
-
+  // ---- Detalles
   const details = document.querySelectorAll('.work-detail');
-  const measure = (el)=>{ el.style.setProperty('--detail-h', (el.scrollHeight||0) + 'px'); };
-
-  const closeDetails = (except=null)=>{
-    details.forEach(d=>{
-      if(d!==except){
+  const measure = (el) => {
+    el.style.setProperty('--detail-h', (el.scrollHeight || 0) + 'px');
+  };
+  const closeDetails = (except = null) => {
+    details.forEach(d => {
+      if (d !== except) {
         d.classList.remove('fluid');
         measure(d);
-        requestAnimationFrame(()=>{
+        requestAnimationFrame(() => {
           d.classList.remove('open');
-          d.style.setProperty('--detail-h','0px');
-          d.setAttribute('aria-hidden','true');
+          d.style.setProperty('--detail-h', '0px');
+          d.setAttribute('aria-hidden', 'true');
         });
-        if(d._ro){ try{ d._ro.disconnect(); }catch(_){} d._ro=null; }
+        if (d._ro) { try { d._ro.disconnect(); } catch (_) {} d._ro = null; }
       }
     });
   };
 
-  function openOrToggleDetail(link){
+  function openOrToggleDetail(link) {
     const id = link.dataset.target;
-    if(!id) return;
-    const detail = document.getElementById('detail-'+id);
-    if(!detail) return;
+    if (!id) return;
+    const detail = document.getElementById('detail-' + id);
+    if (!detail) return;
 
     const group   = link.closest('.work-group');
     const submenu = group?.querySelector('.submenu');
 
-    if(submenu && detail.previousElementSibling !== submenu){
+    // Coloca el detalle justo después del submenú
+    if (submenu && detail.previousElementSibling !== submenu) {
       submenu.insertAdjacentElement('afterend', detail);
     }
 
-    if(detail.classList.contains('open')){
+    // Toggle
+    if (detail.classList.contains('open')) {
       detail.classList.remove('fluid');
       measure(detail);
-      requestAnimationFrame(()=>{
+      requestAnimationFrame(() => {
         detail.classList.remove('open');
-        detail.style.setProperty('--detail-h','0px');
-        detail.setAttribute('aria-hidden','true');
+        detail.style.setProperty('--detail-h', '0px');
+        detail.setAttribute('aria-hidden', 'true');
       });
-      if(detail._ro){ try{ detail._ro.disconnect(); }catch(_){} detail._ro = null; }
-      if(group && group._closeGroup) group._closeGroup();
+      if (detail._ro) { try { detail._ro.disconnect(); } catch (_) {} detail._ro = null; }
+      group?.classList.remove('open');
+      group?.querySelector('.work-tile')?.setAttribute('aria-expanded', 'false');
+      if (submenu) closePanel(submenu);
       return;
     }
 
+    // Abrir este y cerrar el resto
     closeDetails(detail);
+    closeAllGroups(group);
+    group?.classList.add('open');
+    group?.querySelector('.work-tile')?.setAttribute('aria-expanded', 'true');
+    if (submenu) openPanel(submenu);
+
     detail.classList.remove('fluid');
     detail.classList.add('open');
-    detail.setAttribute('aria-hidden','false');
+    detail.setAttribute('aria-hidden', 'false');
 
-    const ro = new ResizeObserver(()=> measure(detail));
+    const ro = new ResizeObserver(() => measure(detail));
     ro.observe(detail);
     detail._ro = ro;
 
-    requestAnimationFrame(()=>{
+    requestAnimationFrame(() => {
       measure(detail);
-      detail.scrollIntoView({behavior:'smooth', block:'start'});
+      detail.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
 
-    setTimeout(()=>{ detail.classList.add('fluid'); }, DETAIL_MS + 60);
+    setTimeout(() => { detail.classList.add('fluid'); }, DETAIL_MS + 60);
 
-    detail.querySelectorAll('img,video').forEach(el=>{
-      if(el.complete || (el.readyState>=2)) return;
-      el.addEventListener('load', ()=> measure(detail), {once:true});
-      el.addEventListener('loadeddata', ()=> measure(detail), {once:true});
-    });
-
-    const onResize = ()=> measure(detail);
-    window.addEventListener('resize', onResize, {passive:true});
-    detail._offResize = onResize;
+    detail.querySelectorAll('img, video').forEach(m =>
+      m.addEventListener('load', () => measure(detail), { once: true })
+    );
+    window.addEventListener('resize', () => measure(detail), { passive: true });
   }
 
-  hub.querySelectorAll('.subitem[data-target]').forEach(link=>{
-    link.addEventListener('click', (e)=>{
+  // ---- Delegación de eventos en todo el HUB
+  hub.addEventListener('click', (e) => {
+    const tile = e.target.closest('.work-tile');
+    if (tile && hub.contains(tile)) {
       e.preventDefault();
-      openOrToggleDetail(link);
-    });
+      const group = tile.closest('.work-group');
+      const panel = group?.querySelector('.submenu');
+      if (!panel) return;
+      const isOpen = group.classList.contains('open');
+      if (isOpen) {
+        group.classList.remove('open');
+        tile.setAttribute('aria-expanded', 'false');
+        closePanel(panel);
+      } else {
+        closeAllGroups(group);
+        group.classList.add('open');
+        tile.setAttribute('aria-expanded', 'true');
+        openPanel(panel);
+      }
+      return;
+    }
+
+    const sub = e.target.closest('.subitem[data-target]');
+    if (sub && hub.contains(sub)) {
+      e.preventDefault();
+      openOrToggleDetail(sub);
+    }
   });
 
-  window.addEventListener('keydown',(e)=>{ if(e.key==='Escape') closeDetails(); });
-
-  // ===== Carruseles (drag + flechas + snap 1 slide) =====
-  document.querySelectorAll('.carousel').forEach(carousel=>{
-    const track = carousel.querySelector('.track');
-    if(!track) return;
-
-    const slides = Array.from(track.children).filter(c => c.classList.contains('item'));
-    const slideW       = ()=> track.clientWidth;
-    const maxIndex     = ()=> Math.max(0, slides.length - 1);
-    const currentIndex = ()=> Math.round(track.scrollLeft / slideW());
-
-    const updateDisabled = (i=currentIndex())=>{
-      const prev = carousel.querySelector('.nav.prev');
-      const next = carousel.querySelector('.nav.next');
-      if(prev) prev.disabled = (i <= 0);
-      if(next) next.disabled = (i >= maxIndex());
-    };
-
-    const goTo = (i)=>{
-      i = Math.max(0, Math.min(i, maxIndex()));
-      track.scrollTo({ left: i * slideW(), behavior: 'smooth' });
-      setTimeout(()=> updateDisabled(i), 250);
-    };
-
-    const snapToNearest = ()=> goTo(currentIndex());
-
-    // Arrastre
-    let isDown=false, startX=0, startLeft=0;
-    const down=(e)=>{
-      isDown = true;
-      carousel.classList.add('dragging');
-      startX = ('touches' in e ? e.touches[0].pageX : e.pageX);
-      startLeft = track.scrollLeft;
-      e.preventDefault();
-    };
-    const move=(e)=>{
-      if(!isDown) return;
-      const x = ('touches' in e ? e.touches[0].pageX : e.pageX);
-      const dx = x - startX;
-      track.scrollLeft = startLeft - dx;
-    };
-    const up=()=>{
-      if(!isDown) return;
-      isDown = false;
-      carousel.classList.remove('dragging');
-      snapToNearest();
-    };
-
-    track.addEventListener('mousedown', down);
-    track.addEventListener('mousemove', move);
-    window.addEventListener('mouseup', up);
-    track.addEventListener('touchstart', down, {passive:false});
-    track.addEventListener('touchmove',  move, {passive:false});
-    window.addEventListener('touchend',  up);
-    track.querySelectorAll('img').forEach(img=> img.draggable=false);
-
-    // Flechas
-    const prev = carousel.querySelector('.nav.prev');
-    const next = carousel.querySelector('.nav.next');
-    if(prev) prev.addEventListener('click', ()=> goTo(currentIndex()-1));
-    if(next) next.addEventListener('click', ()=> goTo(currentIndex()+1));
-
-    // Mantén snap/botones correctos
-    track.addEventListener('scroll', ()=> updateDisabled());
-    window.addEventListener('resize', ()=> goTo(currentIndex()));
-
-    // Alinear primer slide
-    goTo(0);
-    updateDisabled(0);
-  });
+  // ESC cierra detalles
+  window.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDetails(); });
 })();
